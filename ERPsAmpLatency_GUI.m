@@ -14,6 +14,8 @@ classdef ERPsAmpLatency_GUI < matlab.apps.AppBase
         ParadigmsFromFilenamesEditFieldLabel  matlab.ui.control.Label
         ERPsEditField                  matlab.ui.control.EditField
         ERPsEditFieldLabel             matlab.ui.control.Label
+        SpecifyOutputEditField         matlab.ui.control.EditField
+        SpecifyOutputEditFieldLabel    matlab.ui.control.Label
         RegionLabelsEditField          matlab.ui.control.EditField
         RegionLabelsEditFieldLabel     matlab.ui.control.Label
         RegionsEditField               matlab.ui.control.EditField
@@ -22,6 +24,8 @@ classdef ERPsAmpLatency_GUI < matlab.apps.AppBase
         StimulusStartTimeseg01Label    matlab.ui.control.Label
         NumberofParticipantsEditField  matlab.ui.control.NumericEditField
         NumberofParticipantsEditFieldLabel  matlab.ui.control.Label
+        ParticipantsToExcludeEditField matlab.ui.control.EditField
+        ParticipantsToExcludeEditFieldLabel matlab.ui.control.Label
         DataSelectionLabel             matlab.ui.control.Label
         Panel2_4                       matlab.ui.container.Panel
         DatasetDirectoryEditField      matlab.ui.control.EditField
@@ -73,12 +77,18 @@ classdef ERPsAmpLatency_GUI < matlab.apps.AppBase
 
         % Button pushed function: RunButton
         function GenerateAmpLatency(app, event)
-            %% Dataset (Hard Coded)
+            %% Dataset 
             updateAppLayout(app)
             DatasetFold = [app.DatasetDirectoryEditField.Value]; %Location of data
-            PtSize = app.NumberofParticipantsEditField.Value; %The Number of Participants in the Dataset
-            
-              
+            OutputFold = app.SpecifyOutputEditField.Value; %Location of output
+            %% Establish Participant Numbers
+            PtSize = app.NumberofParticipantsEditField.Value; %The N of Participants in the Dataset/Study
+            ExcludePt = app.ParticipantsToExcludeEditField.Value; %Specifies participants to exclude from Dataset
+            ExcludingPts = [];
+            ExcludingPts = str2num(ExcludePt); %Creates array of Participants to exclude
+            PtNums = 1:PtSize; %Creates array of all possible participant numbers                           
+            PtNums(ExcludingPts) = []; %Deletes from array all participants which are to be excluded
+            % FirstPt = PtNums(1); %Sets value of first participant in numerical order (So that if you exclude P1 we'll start analysis with P2)
             %% Regions
             Regions.Chann = app.RegionsEditField.Value;
             ERPs.Regions.Chann = (split(Regions.Chann, ';'));
@@ -136,18 +146,16 @@ classdef ERPsAmpLatency_GUI < matlab.apps.AppBase
             for i = 1:numel(ERPs.Tags)
                 ERPsName = [ERPsName , char(ERPs.Tags{i})];
             end
-            XLNameAmp = [ERPsName,'-Amplitudes-',datestr(now,'mmmm-dd-yyyy_HH_MM_SS'),'.xlsx'];
-            XLNameLat = [ERPsName,'-Latency-',datestr(now,'mmmm-dd-yyyy_HH_MM_SS'),'.xlsx'];
+            XLNameAmp = [OutputFold,ERPsName,'-Amplitudes-',datestr(now,'mmmm-dd-yyyy_HH_MM_SS'),'.xlsx'];
+            XLNameLat = [OutputFold,ERPsName,'-Latency-',datestr(now,'mmmm-dd-yyyy_HH_MM_SS'),'.xlsx'];
             
             
             %% Reading Samples (Edit which participants to skip here(if applicable))
             
             for o = 1:Num_Paradigms %Iterates through the paradigms (e.g. Grid, RandLoc)
-                for pt = 1:PtSize %Iterates through every participant in the dataset
-                    
+                for pt = [PtNums] %Iterates through every participant in the dataset
                     tmpfileAdd = [DatasetFold 'P' num2str(pt) app.FileIdentifierEditField.Value Paradigms{o} '.mat'];
                     [PtSegments{pt,o}, Labels, Fs, ChannInfo] = ImportingBCIData(tmpfileAdd);
-            
                 end
             end
             
@@ -160,7 +168,7 @@ classdef ERPsAmpLatency_GUI < matlab.apps.AppBase
                 tmpHeader = {'Electrode';'Paradigm'};
                 for o = 1:Num_Paradigms
                     
-                    for pt = 1:PtSize
+                    for pt = [PtNums]
                         for Elec = 1:32
                             if ERPs.Tags{f}(1) =='P' %Looking at P300 or P600
                                 [FeatureMat_DiffTvsNT.Peaks(pt,Num_Paradigms*(Elec-1) + o),Ind] = max(PtSegments{pt,o}(1,Elec,ERPs.Ranges{f,1}*Fs:ERPs.Ranges{f,2}*Fs),[],3);
@@ -326,24 +334,35 @@ classdef ERPsAmpLatency_GUI < matlab.apps.AppBase
             % Create NumberofParticipantsEditFieldLabel
             app.NumberofParticipantsEditFieldLabel = uilabel(app.LeftPanel);
             app.NumberofParticipantsEditFieldLabel.HorizontalAlignment = 'right';
-            app.NumberofParticipantsEditFieldLabel.Position = [101 243 126 22];
+            app.NumberofParticipantsEditFieldLabel.Position = [0 243 126 22];
             app.NumberofParticipantsEditFieldLabel.Text = 'Number of Participants';
 
             % Create NumberofParticipantsEditField
             app.NumberofParticipantsEditField = uieditfield(app.LeftPanel, 'numeric');
             app.NumberofParticipantsEditField.Limits = [0 Inf];
-            app.NumberofParticipantsEditField.Position = [243 243 42 22];
+            app.NumberofParticipantsEditField.Position = [125 243 42 22];
             app.NumberofParticipantsEditField.Value = 12;
+            
+            % Create ParticipantsToExcludeEditFieldLabel
+            app.ParticipantsToExcludeEditFieldLabel = uilabel(app.LeftPanel);
+            app.ParticipantsToExcludeEditFieldLabel.HorizontalAlignment = 'right';
+            app.ParticipantsToExcludeEditFieldLabel.Position = [185 243 126 22];
+            app.ParticipantsToExcludeEditFieldLabel.Text = 'Participants to Exclude';
+
+            % Create ParticipantsToExcludeEditField
+            app.ParticipantsToExcludeEditField = uieditfield(app.LeftPanel, 'text');
+            app.ParticipantsToExcludeEditField.Position = [310 243 65 22];
+            app.ParticipantsToExcludeEditField.Value = 'None';
 
             % Create StimulusStartTimeseg01Label
             app.StimulusStartTimeseg01Label = uilabel(app.LeftPanel);
             app.StimulusStartTimeseg01Label.HorizontalAlignment = 'right';
-            app.StimulusStartTimeseg01Label.Position = [344 243 170 22];
+            app.StimulusStartTimeseg01Label.Position = [385 243 170 22];
             app.StimulusStartTimeseg01Label.Text = 'Baseline Duration (s) e.g. 0.2';
 
             % Create StimulusStartTimeseg01EditField_2
             app.StimulusStartTimeseg01EditField_2 = uieditfield(app.LeftPanel, 'numeric');
-            app.StimulusStartTimeseg01EditField_2.Position = [529 243 100 22];
+            app.StimulusStartTimeseg01EditField_2.Position = [565 243 100 22];
             app.StimulusStartTimeseg01EditField_2.Value = 0.2;
 
             % Create RegionsEditFieldLabel
@@ -360,24 +379,35 @@ classdef ERPsAmpLatency_GUI < matlab.apps.AppBase
             % Create RegionLabelsEditFieldLabel
             app.RegionLabelsEditFieldLabel = uilabel(app.LeftPanel);
             app.RegionLabelsEditFieldLabel.HorizontalAlignment = 'right';
-            app.RegionLabelsEditFieldLabel.Position = [39 144 82 22];
+            app.RegionLabelsEditFieldLabel.Position = [39 159 82 22];
             app.RegionLabelsEditFieldLabel.Text = 'Region Labels';
 
             % Create RegionLabelsEditField
             app.RegionLabelsEditField = uieditfield(app.LeftPanel, 'text');
-            app.RegionLabelsEditField.Position = [136 144 544 22];
+            app.RegionLabelsEditField.Position = [136 159 544 22];
             app.RegionLabelsEditField.Value = 'Central;Parietal-Occipital';
 
             % Create ERPsEditFieldLabel
             app.ERPsEditFieldLabel = uilabel(app.LeftPanel);
             app.ERPsEditFieldLabel.HorizontalAlignment = 'right';
-            app.ERPsEditFieldLabel.Position = [40 92 36 22];
+            app.ERPsEditFieldLabel.Position = [40 122 36 22];
             app.ERPsEditFieldLabel.Text = 'ERPs';
 
             % Create ERPsEditField
             app.ERPsEditField = uieditfield(app.LeftPanel, 'text');
-            app.ERPsEditField.Position = [91 92 208 22];
+            app.ERPsEditField.Position = [91 122 208 22];
             app.ERPsEditField.Value = 'P100';
+            
+            % Create SpecifyOutputEditFieldLabel
+            app.SpecifyOutputEditFieldLabel = uilabel(app.LeftPanel);
+            app.SpecifyOutputEditFieldLabel.HorizontalAlignment = 'right';
+            app.SpecifyOutputEditFieldLabel.Position = [40 85 75 22];
+            app.SpecifyOutputEditFieldLabel.Text = 'Output Folder';
+
+            % Create SpecifyOutputEditField
+            app.SpecifyOutputEditField = uieditfield(app.LeftPanel, 'text');
+            app.SpecifyOutputEditField.Position = [115 85 566 22];
+            app.SpecifyOutputEditField.Value = '';
 
             % Create ParadigmsFromFilenamesEditFieldLabel
             app.ParadigmsFromFilenamesEditFieldLabel = uilabel(app.LeftPanel);
@@ -404,12 +434,12 @@ classdef ERPsAmpLatency_GUI < matlab.apps.AppBase
             % Create ERPRangesEditFieldLabel
             app.ERPRangesEditFieldLabel = uilabel(app.LeftPanel);
             app.ERPRangesEditFieldLabel.HorizontalAlignment = 'right';
-            app.ERPRangesEditFieldLabel.Position = [318 92 75 22];
+            app.ERPRangesEditFieldLabel.Position = [318 122 75 22];
             app.ERPRangesEditFieldLabel.Text = 'ERP Ranges';
 
             % Create ERPRangesEditField
             app.ERPRangesEditField = uieditfield(app.LeftPanel, 'text');
-            app.ERPRangesEditField.Position = [408 92 273 22];
+            app.ERPRangesEditField.Position = [408 122 273 22];
             app.ERPRangesEditField.Value = '0.070,0.205';
 
             % Create RunButton
